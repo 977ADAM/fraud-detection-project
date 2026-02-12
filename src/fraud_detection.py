@@ -3,7 +3,7 @@ import pandas as pd
 import joblib
 
 try:
-    model = joblib.load("fraud_detection_pipeline.pkl")
+    model = joblib.load("./model/fraud_detection_pipeline.pkl")
 except:
     st.error("Модель не найдена")
 
