@@ -1,43 +1,10 @@
 import streamlit as st
-import pandas as pd
-import joblib
-from pathlib import Path
-from src.features import add_features
+from src.inference import FraudModel
+from src.config import config
 
-@st.cache_resource
-def load_model():
-    model_path = Path(__file__).parent / "models" / "fraud" / "1.0.0" / "model.pkl"
-    if not model_path.exists():
-        raise FileNotFoundError(f"Model file not found: {model_path}")
-    return joblib.load(model_path)
-
-def prepare_input(
-    transaction_type,
-    amount,
-    oldbalanceOrg,
-    newbalanceOrig,
-    oldbalanceDest,
-    newbalanceDest,
-):
-    try:
-        df = pd.DataFrame([{
-            "type": transaction_type,
-            "amount": float(amount),
-            "oldbalanceOrg": float(oldbalanceOrg),
-            "newbalanceOrig": float(newbalanceOrig),
-            "oldbalanceDest": float(oldbalanceDest),
-            "newbalanceDest": float(newbalanceDest),
-        }])
-    except (TypeError, ValueError) as e:
-        raise ValueError(f"Ошибка преобразования входных данных: {e}")
-
-    # Добавляем инженерные признаки (как при обучении)
-    df = add_features(df)
-
-    return df
 
 try:
-    model = load_model()
+    model = FraudModel()
 except FileNotFoundError:
     st.error("Модель не найдена")
     st.stop()
@@ -47,7 +14,7 @@ except Exception as e:
 
 st.title('💳 Fraud Detection System')
 st.markdown('Модель машинного обучения для обнаружения мошеннических транзакций')
-st.caption(f"Model version: 1.0.0")
+st.caption(f"Model version: {config.version}")
 st.divider()
 
 transaction_type = st.selectbox(
@@ -77,31 +44,27 @@ if st.button('Predict'):
             st.warning("Сумма транзакции превышает баланс отправителя.")
             st.stop()
 
-        input_data = prepare_input(
-            transaction_type,
-            amount,
-            oldbalanceOrg,
-            newbalanceOrig,
-            oldbalanceDest,
-            newbalanceDest,
-        )
+        input_data = {
+            "type": transaction_type,
+            "amount": amount,
+            "oldbalanceOrg": oldbalanceOrg,
+            "newbalanceOrig": newbalanceOrig,
+            "oldbalanceDest": oldbalanceDest,
+            "newbalanceDest": newbalanceDest,
+        }
+
+        result = model.predict(input_data)
 
         try:
-            prediction = int(model.predict(input_data)[0])
+            prediction = result.prediction
         except Exception as e:
             st.error(f"Ошибка предсказания: {e}")
             st.stop()
 
-        proba = None
-        if hasattr(model, "predict_proba"):
-            try:
-                proba_values = model.predict_proba(input_data)
-                if proba_values.shape[1] > 1:
-                    proba = float(proba_values[0][1])
-                    st.metric("Вероятность мошенничества", f"{proba:.2%}")
-            except Exception:
-                st.warning("Не удалось вычислить вероятность.")
+        proba = result.probability
 
+        if proba is not None:
+            st.metric("Вероятность мошенничества", f"{proba:.2%}")
 
         label = "Мошенничество" if prediction == 1 else "Не мошенничество"
         st.subheader(f'Прогноз: {label}')

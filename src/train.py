@@ -135,6 +135,8 @@ def main():
     else:
         print("ROC-AUC: недоступен")
 
+    feature_names = pipeline.named_steps["preprocess"].get_feature_names_out()
+
     output_dir = save_model(
         model=pipeline,
         metrics={
@@ -145,6 +147,7 @@ def main():
             "max_iter": config.max_iter,
             "random_state": config.random_state,
             "test_size": config.test_size,
+            "feature_names": list(feature_names),
         },
         dataset_id=config.dataset_id,
         name=config.name,

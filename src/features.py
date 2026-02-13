@@ -40,9 +40,6 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
     for col in required_cols:
         if not pd.api.types.is_numeric_dtype(df[col]):
             raise TypeError(f"Колонка {col} должна быть числовой")
-        
-    if (df[required_cols] < 0).any().any():
-        raise ValueError("Баланс не может быть отрицательным")
 
     df["balanceDiffOrig"] = df["oldbalanceOrg"] - df["newbalanceOrig"]
     df["balanceDiffDest"] = df["newbalanceDest"] - df["oldbalanceDest"]
