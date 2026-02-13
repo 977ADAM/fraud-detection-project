@@ -34,7 +34,17 @@ class FraudModel:
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
         self.model = joblib.load(model_path)
-        self.expected_features = self.model.named_steps["preprocess"].get_feature_names_out()
+
+
+        if not hasattr(self.model, "named_steps") or "preprocess" not in self.model.named_steps:
+            raise ValueError("Model does not contain 'preprocess' step")
+
+        preprocess = self.model.named_steps["preprocess"]
+
+        if not hasattr(preprocess, "get_feature_names_out"):
+            raise ValueError("Preprocess step does not expose feature names")
+
+        self.expected_features = preprocess.get_feature_names_out()
 
     def _prepare_dataframe(self, data: Dict[str, Any]) -> pd.DataFrame:
 
@@ -72,9 +82,27 @@ class FraudModel:
 
         df = add_features(df)
 
+        missing_features = set(self.expected_features) - set(
+            self.model.named_steps["preprocess"].feature_names_in_
+        )
+
+        if missing_features:
+            raise ValueError(
+                f"Inference features mismatch. Missing: {missing_features}"
+            )
+        
+        if df["newbalanceOrig"].iloc[0] > df["oldbalanceOrg"].iloc[0]:
+            raise ValueError("newbalanceOrig cannot exceed oldbalanceOrg")
+
+        if (
+            df["amount"].iloc[0] > df["oldbalanceOrg"].iloc[0]
+            and df["type"].iloc[0] in ["PAYMENT", "TRANSFER", "CASH_OUT"]
+        ):
+            raise ValueError("Transaction amount exceeds sender balance")
+
         return df
 
-    def predict(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def predict(self, data: Dict[str, Any]) -> PredictionResult:
 
         df = self._prepare_dataframe(data)
 
