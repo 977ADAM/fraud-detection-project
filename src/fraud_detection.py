@@ -2,13 +2,36 @@ import streamlit as st
 import pandas as pd
 import joblib
 from pathlib import Path
+from src.features import add_features
 
 @st.cache_resource
 def load_model():
-    model_path = Path(__file__).parent / "model" / "fraud_detection_pipeline_v1.pkl"
+    model_path = Path(__file__).parent / "models" / "fraud" / "1.0.0" / "model.pkl"
     if not model_path.exists():
         raise FileNotFoundError(f"Model file not found: {model_path}")
     return joblib.load(model_path)
+
+def prepare_input(
+    transaction_type,
+    amount,
+    oldbalanceOrg,
+    newbalanceOrig,
+    oldbalanceDest,
+    newbalanceDest,
+):
+    df = pd.DataFrame([{
+        "type": transaction_type,
+        "amount": float(amount),
+        "oldbalanceOrg": float(oldbalanceOrg),
+        "newbalanceOrig": float(newbalanceOrig),
+        "oldbalanceDest": float(oldbalanceDest),
+        "newbalanceDest": float(newbalanceDest),
+    }])
+
+    # Добавляем инженерные признаки (как при обучении)
+    df = add_features(df)
+
+    return df
 
 try:
     model = load_model()
@@ -50,21 +73,14 @@ if st.button('Predict'):
             st.warning("Сумма транзакции превышает баланс отправителя.")
             st.stop()
 
-        input_data = pd.DataFrame([[
+        input_data = prepare_input(
             transaction_type,
-            float(amount),
-            float(oldbalanceOrg),
-            float(newbalanceOrig),
-            float(oldbalanceDest),
-            float(newbalanceDest),
-        ]], columns=[
-            'type',
-            'amount',
-            'oldbalanceOrg',
-            'newbalanceOrig',
-            'oldbalanceDest',
-            'newbalanceDest',
-        ])
+            amount,
+            oldbalanceOrg,
+            newbalanceOrig,
+            oldbalanceDest,
+            newbalanceDest,
+        )
 
         try:
             prediction = int(model.predict(input_data)[0])
@@ -75,10 +91,10 @@ if st.button('Predict'):
         proba = None
         if hasattr(model, "predict_proba"):
             try:
-                proba = model.predict_proba(input_data)[0][1]
+                proba = float(model.predict_proba(input_data)[0][1])
                 st.metric("Вероятность мошенничества", f"{proba:.2%}")
             except Exception:
-                pass
+                st.warning("Не удалось вычислить вероятность.")
 
 
         label = "Мошенничество" if prediction == 1 else "Не мошенничество"

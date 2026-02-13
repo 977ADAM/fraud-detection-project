@@ -4,6 +4,7 @@ from typing import Tuple, List
 NUMERICALS = ["amount", "oldbalanceOrg", "newbalanceOrig", "oldbalanceDest", "newbalanceDest"]
 CATEGORICALS = ["type"]
 ENGINEERED = ["balanceDiffOrig", "balanceDiffDest"]
+DROP_COLUMNS = ["step", "nameOrig", "nameDest", "isFlaggedFraud"]
 
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -13,7 +14,8 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
         oldbalanceOrg, newbalanceOrig,
         oldbalanceDest, newbalanceDest
     """
-    df = df.copy()
+    
+    df = df.copy() # не пишу deep=True он и так по умолчанию
     
     # требуемые столбцы
     required_cols = [
@@ -30,12 +32,7 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
     df["balanceDiffOrig"] = df["oldbalanceOrg"] - df["newbalanceOrig"]
     df["balanceDiffDest"] = df["newbalanceDest"] - df["oldbalanceDest"]
 
-    df.drop(
-        ["step", "nameOrig", "nameDest", "isFlaggedFraud"],
-        axis=1,
-        errors="ignore",
-        inplace=True,
-    )
+    df = df.drop(columns=DROP_COLUMNS, errors="ignore")
 
     return df
 
