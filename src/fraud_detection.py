@@ -19,14 +19,17 @@ def prepare_input(
     oldbalanceDest,
     newbalanceDest,
 ):
-    df = pd.DataFrame([{
-        "type": transaction_type,
-        "amount": float(amount),
-        "oldbalanceOrg": float(oldbalanceOrg),
-        "newbalanceOrig": float(newbalanceOrig),
-        "oldbalanceDest": float(oldbalanceDest),
-        "newbalanceDest": float(newbalanceDest),
-    }])
+    try:
+        df = pd.DataFrame([{
+            "type": transaction_type,
+            "amount": float(amount),
+            "oldbalanceOrg": float(oldbalanceOrg),
+            "newbalanceOrig": float(newbalanceOrig),
+            "oldbalanceDest": float(oldbalanceDest),
+            "newbalanceDest": float(newbalanceDest),
+        }])
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"Ошибка преобразования входных данных: {e}")
 
     # Добавляем инженерные признаки (как при обучении)
     df = add_features(df)
@@ -44,6 +47,7 @@ except Exception as e:
 
 st.title('💳 Fraud Detection System')
 st.markdown('Модель машинного обучения для обнаружения мошеннических транзакций')
+st.caption(f"Model version: 1.0.0")
 st.divider()
 
 transaction_type = st.selectbox(
@@ -91,8 +95,10 @@ if st.button('Predict'):
         proba = None
         if hasattr(model, "predict_proba"):
             try:
-                proba = float(model.predict_proba(input_data)[0][1])
-                st.metric("Вероятность мошенничества", f"{proba:.2%}")
+                proba_values = model.predict_proba(input_data)
+                if proba_values.shape[1] > 1:
+                    proba = float(proba_values[0][1])
+                    st.metric("Вероятность мошенничества", f"{proba:.2%}")
             except Exception:
                 st.warning("Не удалось вычислить вероятность.")
 

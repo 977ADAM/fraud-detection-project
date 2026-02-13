@@ -13,6 +13,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 
 from src.features import add_features, all_feature_columns
+from src.config import config
 
 def load_data(path: str, target_col="isFraud"):
     df = pd.read_csv(path)
@@ -53,10 +54,10 @@ def build_model():
         (
             'clf',
             LogisticRegression(
-                class_weight='balanced',
-                max_iter=2000,
-                random_state=42,
-                solver='lbfgs',
+                class_weight = config.class_weight,
+                max_iter = config.max_iter,
+                random_state = config.random_state,
+                solver = config.solver,
             ),
         )
     ])
@@ -99,12 +100,15 @@ def main():
 
     X, y = load_data(str(data_path))
 
+    if pd.isnull(X).any().any():
+        raise ValueError("В данных есть NaN перед обучением.")
+
     X_train, X_test, y_train, y_test = train_test_split(
         X,
         y,
-        test_size=0.3,
+        test_size=config.test_size,
         stratify=y,
-        random_state=42,
+        random_state=config.random_state,
     )
 
     pipeline = build_model()
@@ -113,8 +117,7 @@ def main():
     y_pred = pipeline.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
 
-
-    if hasattr(pipeline, "predict_proba"):
+    if len(set(y_test)) > 1 and hasattr(pipeline, "predict_proba"):
         y_proba = pipeline.predict_proba(X_test)[:, 1]
         roc_auc = roc_auc_score(y_test, y_proba)
     else:
@@ -126,7 +129,11 @@ def main():
     print("Confusion matrix:")
     print(confusion_matrix(y_test, y_pred))
     print(f"Accuracy: {acc:.4f}")
-    print(f"ROC-AUC: {roc_auc:.4f}")
+    
+    if roc_auc is not None:
+        print(f"ROC-AUC: {roc_auc:.4f}")
+    else:
+        print("ROC-AUC: недоступен")
 
     output_dir = save_model(
         model=pipeline,
@@ -135,13 +142,13 @@ def main():
             "roc_auc": roc_auc,
         },
         params={
-            "max_iter": 1000,
-            "random_state": 42,
-            "test_size": 0.3,
+            "max_iter": config.max_iter,
+            "random_state": config.random_state,
+            "test_size": config.test_size,
         },
-        dataset_id="fraud:v1",
-        name="fraud",
-        version="1.0.0",
+        dataset_id=config.dataset_id,
+        name=config.name,
+        version=config.version,
     )
     print(f"Модель сохранена в: {output_dir}")
 
