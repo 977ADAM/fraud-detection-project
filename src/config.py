@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Union
 
 ALLOWED_TRANSACTION_TYPES: Tuple[str, ...] = (
     "PAYMENT",
@@ -30,13 +30,38 @@ class Config:
     data_base_dir: str = "data"
     target_column: str = "isFraud"
     metadata_name: str = "metadata.json"
+    project_root: Path = field(
+        default_factory=lambda: Path(__file__).resolve().parents[1]
+    )
+
+    def resolve_path(self, path: Union[str, Path]) -> Path:
+        path = Path(path)
+        if path.is_absolute():
+            return path
+        return self.project_root / path
+
+    @property
+    def model_base_path(self) -> Path:
+        return self.resolve_path(self.model_base_dir)
+
+    @property
+    def data_base_path(self) -> Path:
+        return self.resolve_path(self.data_base_dir)
 
     @property
     def model_dir(self) -> Path:
-        return Path(self.model_base_dir) / self.name / self.version
+        return self.model_base_path / self.name / self.version
+
+    @property
+    def model_path(self) -> Path:
+        return self.model_dir / "model.pkl"
 
     @property
     def metadata_path(self) -> Path:
         return self.model_dir / self.metadata_name
+
+    @property
+    def dataset_path(self) -> Path:
+        return self.data_base_path / "dataset.csv"
 
 config = Config()

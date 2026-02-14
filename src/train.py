@@ -79,9 +79,9 @@ def save_model(
         dataset_id: str,
         name: str,
         version: str,
-        base_dir: str = config.model_base_dir) -> Path:
+        base_dir: Path = config.model_base_path) -> Path:
     
-    out_dir = Path(base_dir) / name / version
+    out_dir = config.resolve_path(base_dir) / name / version
     out_dir.mkdir(parents=True, exist_ok=True)
 
     model_path = out_dir / "model.pkl"
@@ -103,7 +103,7 @@ def save_model(
 
 def main():
 
-    data_path = Path(config.data_base_dir) / "dataset.csv"
+    data_path = config.dataset_path
 
     if not data_path.exists():
         raise FileNotFoundError(f"Dataset не найден по этому пути: {data_path}")

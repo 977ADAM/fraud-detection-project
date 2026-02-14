@@ -8,15 +8,9 @@ import json
 
 from src.features import add_features
 
-from src.config import config, DEBIT_TRANSACTION_TYPES, ALLOWED_TRANSACTION_TYPES
+from src.config import config, ALLOWED_TRANSACTION_TYPES
 
-DEFAULT_MODEL_PATH = (
-    Path(__file__).parent
-    / config.model_base_dir
-    / config.name
-    / config.version
-    / "model.pkl"
-)
+DEFAULT_MODEL_PATH = config.model_path
 
 
 @dataclass
@@ -29,6 +23,7 @@ class PredictionResult:
 class FraudModel:
 
     def __init__(self, model_path: Path = DEFAULT_MODEL_PATH):
+        model_path = config.resolve_path(model_path)
 
         metadata_path = model_path.parent / config.metadata_name
 
