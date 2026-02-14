@@ -7,14 +7,14 @@ from pathlib import Path
 from typing import Optional, Union
 
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, FunctionTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 
-from src.features import add_features, all_feature_columns
-from src.config import config
+from features import add_features, all_feature_columns
+from config import config
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -33,8 +33,6 @@ def load_data(path: Union[str, Path], target_col=config.target_column):
     y = df[target_col].astype(int).values
 
     df = df.drop(columns=[target_col])
-
-    df = add_features(df)
 
     X = df
 
@@ -58,6 +56,7 @@ def build_model():
     )
 
     pipeline = Pipeline([
+        ("features", FunctionTransformer(add_features, validate=False)),
         ("preprocess", preprocess),
         (
             'clf',
@@ -101,11 +100,12 @@ def save_model(
     }
     
     (out_dir / config.metadata_name).write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
-    return out_dir
+    return model_path
 
 def main():
 
     data_path = config.dataset_path
+    logger.info(data_path)
 
     if not data_path.exists():
         raise FileNotFoundError(f"Dataset не найден по этому пути: {data_path}")
@@ -137,7 +137,8 @@ def main():
         roc_auc = None
 
     logger.info("Classification report:")
-    logger.info(classification_report(y_test, y_pred))
+    report = classification_report(y_test, y_pred, output_dict=True)
+    logger.info(json.dumps(report, indent=2))
     logger.info("Confusion matrix:")
     logger.info(confusion_matrix(y_test, y_pred))
 

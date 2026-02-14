@@ -6,9 +6,15 @@ import joblib
 import pandas as pd
 import json
 
-from src.features import add_features
+from config import config, ALLOWED_TRANSACTION_TYPES
 
-from src.config import config, ALLOWED_TRANSACTION_TYPES
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL_PATH = config.model_path
 
@@ -30,32 +36,27 @@ class FraudModel:
         metadata_path = model_path.parent / config.metadata_name
 
         if metadata_path.exists():
-            self.metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-
-            if self.metadata.get("version") != config.version:
-                raise ValueError(
-                    f"Model version mismatch: "
-                    f"{self.metadata.get('version')} != {config.version}"
-                )
+            with metadata_path.open("r", encoding="utf-8") as f:
+                self.metadata = json.load(f)
         else:
             raise FileNotFoundError(f"Metadata not found: {metadata_path}")
+        
+        if self.metadata.get("version") != config.version:
+            raise ValueError(
+                f"Model version mismatch. "
+                f"Metadata version={self.metadata.get('version')} "
+                f"Config version={config.version}"
+            )
 
         self.model = joblib.load(model_path)
-
-
-        if not hasattr(self.model, "named_steps") or "preprocess" not in self.model.named_steps:
-            raise ValueError("Model does not contain 'preprocess' step")
-
-        preprocess = self.model.named_steps["preprocess"]
-
-        if not hasattr(preprocess, "get_feature_names_out"):
-            raise ValueError("Preprocess step does not expose feature names")
-
-        self.expected_features = preprocess.get_feature_names_out()
 
         self.feature_schema = self.metadata.get("feature_schema")
         if not self.feature_schema:
             raise ValueError("Feature schema missing in metadata")
+        
+        engineered = self.feature_schema.get("engineered")
+        if engineered is None:
+            raise ValueError("В схеме функций отсутствуют инженерные функции.")
 
 
 
@@ -73,8 +74,13 @@ class FraudModel:
         missing = [f for f in required_fields if f not in data]
 
         if missing:
-            
             raise ValueError(f"Missing required fields: {missing}")
+        
+        if data["type"] not in ALLOWED_TRANSACTION_TYPES:
+            raise ValueError(
+                f"Unsupported transaction type '{data['type']}'. "
+                f"Allowed: {ALLOWED_TRANSACTION_TYPES}"
+            )
 
         try:
             df = pd.DataFrame([{
@@ -93,21 +99,20 @@ class FraudModel:
         if df.isnull().any().any():
             raise ValueError("Dataset содержит NaN до feature engineering")
 
-        df = add_features(df)
+        numeric_cols = [
+            "amount",
+            "oldbalanceOrg",
+            "newbalanceOrig",
+            "oldbalanceDest",
+            "newbalanceDest",
+        ]
 
-
-        tx_type = df["type"].iloc[0]
-
-        if tx_type not in ALLOWED_TRANSACTION_TYPES:
-            raise ValueError(
-                f"Unsupported transaction type: {tx_type}. "
-                f"Allowed types: {ALLOWED_TRANSACTION_TYPES}"
-            )
-        
+        if (df[numeric_cols] < 0).any().any():
+            raise ValueError("Отрицательные значения недопустимы")
 
         expected_raw_columns = (
-            self.feature_schema["numerical"]
-            + self.feature_schema["categorical"]
+            self.feature_schema.get("numerical", [])
+            + self.feature_schema.get("categorical", [])
         )
 
         missing_cols = [
@@ -118,8 +123,14 @@ class FraudModel:
             raise ValueError(
                 f"Input schema mismatch. Missing columns: {missing_cols}"
             )
-        # Pipeline уже гарантирует корректность.
-        # ML модель должна принимать данные, а не блокировать их.
+        
+        unexpected_cols = [
+            col for col in df.columns if col not in expected_raw_columns
+        ]
+        if unexpected_cols:
+            logger.warning(f"Неожиданные столбцы во входных данных: {unexpected_cols}")
+
+        logger.info(f"Столбцы фрейма данных Inference: {df.columns.tolist()}")
 
         return df
 
@@ -128,9 +139,15 @@ class FraudModel:
         df = self._prepare_dataframe(data)
 
         try:
-            prediction = int(self.model.predict(df)[0])
+            prediction_array = self.model.predict(df)
         except Exception as e:
+            logger.exception("Model inference failed")
             raise ValueError(f"Inference failed: {e}")
+
+        if len(prediction_array) != 1:
+            raise ValueError("Unexpected prediction shape")
+
+        prediction = int(prediction_array[0])
         
         probability = None
 

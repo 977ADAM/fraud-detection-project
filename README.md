@@ -12,6 +12,18 @@ https://www.kaggle.com/datasets/amanalisiddiqui/fraud-detection-dataset/data
 python train.py
 ```
 
+## Версионирование модели
+Модель проверяет соответствие версии из metadata и config.version.
+Несоответствие приведёт к ошибке загрузки.
+
+## Воспроизводимость
+Версия Python и версия sklearn должны совпадать с метаданными.
+
+⚠ Важно:
+metadata.feature_schema используется для проверки входных данных.
+Если вы изменили список признаков — необходимо пересобрать модель.
+
+
 ## Инференс (UI)
 ```bash
 streamlit run fraud_detection.py

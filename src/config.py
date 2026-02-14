@@ -1,6 +1,9 @@
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_TRANSACTION_TYPES: Tuple[str, ...] = (
     "PAYMENT",
@@ -18,8 +21,8 @@ DEBIT_TRANSACTION_TYPES: Tuple[str, ...] = (
 
 @dataclass(frozen=True)
 class Config:
-    version: str = "1.0.0"
-    dataset_id: str = "fraud:v1"
+    version: str = "3.0.0"
+    dataset_id: str = "fraud:v3"
     name: str = "fraud"
     max_iter: int = 2000
     random_state: int = 42
@@ -36,8 +39,19 @@ class Config:
         default_factory=lambda: Path(__file__).resolve().parents[1]
     )
 
+    def __post_init__(self):
+
+        if self.solver not in {"lbfgs", "liblinear", "saga"}:
+            raise ValueError(f"Unsupported solver: {self.solver}")
+        
+        if self.solver == "liblinear" and self.class_weight == "balanced":
+            logger.warning("liblinear + balanced может вести к нестабильной сходимости")
+
+        if not 0 < self.test_size < 1:
+            raise ValueError("test_size должен быть в диапазоне (0,1)")
+
     def resolve_path(self, path: Union[str, Path]) -> Path:
-        path = Path(path).expanduser()
+        path = Path(path)
         if path.is_absolute():
             return path
         return self.project_root / path
@@ -67,3 +81,8 @@ class Config:
         return self.data_base_path / self.dataset_file_name
 
 config = Config()
+
+
+if __name__ == "__main__":
+
+    print(config.dataset_path)

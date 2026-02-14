@@ -1,6 +1,6 @@
 import streamlit as st
-from src.inference import FraudModel
-from src.config import config, ALLOWED_TRANSACTION_TYPES
+from inference import FraudModel
+from config import config, ALLOWED_TRANSACTION_TYPES
 
 
 try:
@@ -52,13 +52,13 @@ if st.button('Predict'):
             st.stop()
 
         prediction = result.prediction
+        label = result.label
 
         proba = result.probability
 
         if proba is not None:
             st.metric("Вероятность мошенничества", f"{proba:.2%}")
 
-        label = "Мошенничество" if prediction == 1 else "Не мошенничество"
         st.subheader(f'Прогноз: {label}')
 
         if prediction == 1:
