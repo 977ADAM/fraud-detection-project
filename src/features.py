@@ -1,9 +1,9 @@
 import pandas as pd
 from typing import Tuple, List
-from src.config import ENGINEERED
 
 NUMERICALS = ["amount", "oldbalanceOrg", "newbalanceOrig", "oldbalanceDest", "newbalanceDest"]
 CATEGORICALS = ["type"]
+ENGINEERED = ["balanceDiffOrig", "balanceDiffDest"]
 DROP_COLUMNS = ["step", "nameOrig", "nameDest", "isFlaggedFraud"]
 
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -48,9 +48,5 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-def all_feature_columns() -> Tuple[List[str], List[str]]:
-    """
-    Возвращает список числовых и категориальных признаков
-    с учетом инженерных признаков.
-    """
-    return list(NUMERICALS + ENGINEERED), list(CATEGORICALS)
+def all_feature_columns() -> Tuple[List[str], List[str], List[str]]:
+    return list(NUMERICALS), list(CATEGORICALS), list(ENGINEERED)

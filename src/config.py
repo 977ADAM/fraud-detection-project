@@ -16,8 +16,6 @@ DEBIT_TRANSACTION_TYPES: Tuple[str, ...] = (
     "CASH_OUT",
 )
 
-ENGINEERED = ["balanceDiffOrig", "balanceDiffDest"]
-
 @dataclass(frozen=True)
 class Config:
     version: str = "1.0.0"

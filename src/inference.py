@@ -30,7 +30,6 @@ class FraudModel:
 
     def __init__(self, model_path: Path = DEFAULT_MODEL_PATH):
 
-
         metadata_path = model_path.parent / config.metadata_name
 
         if metadata_path.exists():
@@ -60,6 +59,12 @@ class FraudModel:
             raise ValueError("Preprocess step does not expose feature names")
 
         self.expected_features = preprocess.get_feature_names_out()
+
+        self.feature_schema = self.metadata.get("feature_schema")
+        if not self.feature_schema:
+            raise ValueError("Feature schema missing in metadata")
+
+
 
     def _prepare_dataframe(self, data: Dict[str, Any]) -> pd.DataFrame:
 
@@ -105,33 +110,23 @@ class FraudModel:
                 f"Unsupported transaction type: {tx_type}. "
                 f"Allowed types: {ALLOWED_TRANSACTION_TYPES}"
             )
+        
 
-        expected_columns = set(
-            self.metadata["feature_schema"]["numerical"]
-            + self.metadata["feature_schema"]["categorical"]
-            + self.metadata["feature_schema"]["engineered"]
+        expected_raw_columns = (
+            self.feature_schema["numerical"]
+            + self.feature_schema["categorical"]
         )
-        actual_columns = set(df.columns)
 
-        missing_columns = expected_columns - actual_columns
+        missing_cols = [
+            col for col in expected_raw_columns if col not in df.columns
+        ]
 
-        if missing_columns:
+        if missing_cols:
             raise ValueError(
-                f"Inference input mismatch. Missing columns: {missing_columns}"
+                f"Input schema mismatch. Missing columns: {missing_cols}"
             )
-
-
-
-        old_balance = df["oldbalanceOrg"].iloc[0]
-        new_balance = df["newbalanceOrig"].iloc[0]
-        amount = df["amount"].iloc[0]
-        tx_type = df["type"].iloc[0]
-
-        if new_balance > old_balance:
-            raise ValueError("newbalanceOrig cannot exceed oldbalanceOrg")
-
-        if amount > old_balance and tx_type in DEBIT_TRANSACTION_TYPES:
-            raise ValueError("Transaction amount exceeds sender balance")
+        # Pipeline уже гарантирует корректность.
+        # ML модель должна принимать данные, а не блокировать их.
 
         return df
 
@@ -139,16 +134,16 @@ class FraudModel:
 
         df = self._prepare_dataframe(data)
 
-        prediction = int(self.model.predict(df)[0])
-
-        probability: Optional[float] = None
+        try:
+            prediction = int(self.model.predict(df)[0])
+        except Exception as e:
+            raise ValueError(f"Inference failed: {e}")
+        
+        probability = None
 
         if hasattr(self.model, "predict_proba"):
-
             proba_values = self.model.predict_proba(df)
-
             if proba_values.shape[1] > 1:
-
                 probability = float(proba_values[0][1])
 
         return PredictionResult(

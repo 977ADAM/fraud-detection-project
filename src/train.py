@@ -13,7 +13,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 
 from src.features import add_features, all_feature_columns
-from src.config import config, ENGINEERED
+from src.config import config
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -41,7 +41,9 @@ def load_data(path: str, target_col=config.target_column):
 
 
 def build_model():
-    num_cols, cat_cols = all_feature_columns()
+    num_cols, cat_cols, engineered_cols = all_feature_columns()
+
+    num_cols = num_cols + engineered_cols
 
     if not num_cols and not cat_cols:
         raise ValueError("Список признаков пуст.")
@@ -67,7 +69,7 @@ def build_model():
         )
     ])
 
-    return pipeline, num_cols, cat_cols
+    return pipeline, num_cols, cat_cols, engineered_cols
 
 def save_model(
         model,
@@ -119,7 +121,7 @@ def main():
         random_state=config.random_state,
     )
 
-    pipeline, num_cols, cat_cols = build_model()
+    pipeline, num_cols, cat_cols, engineered_cols = build_model()
 
     pipeline.fit(X_train, y_train)
     y_pred = pipeline.predict(X_test)
@@ -161,7 +163,7 @@ def main():
         feature_schema = {
             "numerical": num_cols,
             "categorical": cat_cols,
-            "engineered": list(ENGINEERED),
+            "engineered": engineered_cols,
         },
         dataset_id=config.dataset_id,
         name=config.name,
