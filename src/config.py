@@ -28,6 +28,8 @@ class Config:
     solver: str = "lbfgs"
     model_base_dir: str = "models"
     data_base_dir: str = "data"
+    model_file_name: str = "model.pkl"
+    dataset_file_name: str = "dataset.csv"
     target_column: str = "isFraud"
     metadata_name: str = "metadata.json"
     project_root: Path = field(
@@ -35,7 +37,7 @@ class Config:
     )
 
     def resolve_path(self, path: Union[str, Path]) -> Path:
-        path = Path(path)
+        path = Path(path).expanduser()
         if path.is_absolute():
             return path
         return self.project_root / path
@@ -54,7 +56,7 @@ class Config:
 
     @property
     def model_path(self) -> Path:
-        return self.model_dir / "model.pkl"
+        return self.model_dir / self.model_file_name
 
     @property
     def metadata_path(self) -> Path:
@@ -62,6 +64,6 @@ class Config:
 
     @property
     def dataset_path(self) -> Path:
-        return self.data_base_path / "dataset.csv"
+        return self.data_base_path / self.dataset_file_name
 
 config = Config()

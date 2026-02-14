@@ -24,11 +24,13 @@ class FraudModel:
 
     def __init__(self, model_path: Path = DEFAULT_MODEL_PATH):
         model_path = config.resolve_path(model_path)
+        if not model_path.exists():
+            raise FileNotFoundError(f"Model file not found: {model_path}")
 
         metadata_path = model_path.parent / config.metadata_name
 
         if metadata_path.exists():
-            self.metadata = json.loads(metadata_path.read_text())
+            self.metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
 
             if self.metadata.get("version") != config.version:
                 raise ValueError(
@@ -37,10 +39,6 @@ class FraudModel:
                 )
         else:
             raise FileNotFoundError(f"Metadata not found: {metadata_path}")
-
-        if not model_path.exists():
-
-            raise FileNotFoundError(f"Model file not found: {model_path}")
 
         self.model = joblib.load(model_path)
 

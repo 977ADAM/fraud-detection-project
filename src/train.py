@@ -4,6 +4,7 @@ import json
 
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional, Union
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -20,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def load_data(path: str, target_col=config.target_column):
+def load_data(path: Union[str, Path], target_col=config.target_column):
     df = pd.read_csv(path)
 
     if df.empty:
@@ -79,12 +80,13 @@ def save_model(
         dataset_id: str,
         name: str,
         version: str,
-        base_dir: Path = config.model_base_path) -> Path:
+        base_dir: Optional[Union[str, Path]] = None) -> Path:
     
-    out_dir = config.resolve_path(base_dir) / name / version
+    root_dir = config.model_base_path if base_dir is None else config.resolve_path(base_dir)
+    out_dir = root_dir / name / version
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    model_path = out_dir / "model.pkl"
+    model_path = out_dir / config.model_file_name
     joblib.dump(model, model_path)
 
     metadata = {
@@ -108,7 +110,7 @@ def main():
     if not data_path.exists():
         raise FileNotFoundError(f"Dataset не найден по этому пути: {data_path}")
 
-    X, y = load_data(str(data_path))
+    X, y = load_data(data_path)
 
     if pd.isnull(X).any().any():
         raise ValueError("В данных есть NaN перед обучением.")
