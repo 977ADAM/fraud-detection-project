@@ -6,7 +6,7 @@ import joblib
 import pandas as pd
 import json
 
-from config import config, ALLOWED_TRANSACTION_TYPES
+from config import config
 
 import logging
 
@@ -53,12 +53,6 @@ class FraudModel:
         self.feature_schema = self.metadata.get("feature_schema")
         if not self.feature_schema:
             raise ValueError("Feature schema missing in metadata")
-        
-        engineered = self.feature_schema.get("engineered")
-        if engineered is None:
-            raise ValueError("В схеме функций отсутствуют инженерные функции.")
-
-
 
     def _prepare_dataframe(self, data: Dict[str, Any]) -> pd.DataFrame:
 
@@ -75,12 +69,6 @@ class FraudModel:
 
         if missing:
             raise ValueError(f"Missing required fields: {missing}")
-        
-        if data["type"] not in ALLOWED_TRANSACTION_TYPES:
-            raise ValueError(
-                f"Unsupported transaction type '{data['type']}'. "
-                f"Allowed: {ALLOWED_TRANSACTION_TYPES}"
-            )
 
         try:
             df = pd.DataFrame([{
@@ -99,21 +87,17 @@ class FraudModel:
         if df.isnull().any().any():
             raise ValueError("Dataset содержит NaN до feature engineering")
 
-        numeric_cols = [
-            "amount",
-            "oldbalanceOrg",
-            "newbalanceOrig",
-            "oldbalanceDest",
-            "newbalanceDest",
-        ]
-
-        if (df[numeric_cols] < 0).any().any():
-            raise ValueError("Отрицательные значения недопустимы")
-
         expected_raw_columns = (
             self.feature_schema.get("numerical", [])
-            + self.feature_schema.get("categorical", [])
         )
+
+        # Исключаем engineered признаки из raw ожиданий
+        engineered = self.feature_schema.get("engineered", [])
+        expected_raw_columns = [
+            col for col in expected_raw_columns if col not in engineered
+        ]
+
+        expected_raw_columns += self.feature_schema.get("categorical", [])
 
         missing_cols = [
             col for col in expected_raw_columns if col not in df.columns
@@ -154,7 +138,8 @@ class FraudModel:
         if hasattr(self.model, "predict_proba"):
             proba_values = self.model.predict_proba(df)
             if proba_values.shape[1] > 1:
-                probability = float(proba_values[0][1])
+                class_index = list(self.model.classes_).index(1)
+                probability = float(proba_values[0][class_index])
 
         return PredictionResult(
             prediction=prediction,

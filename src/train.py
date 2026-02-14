@@ -41,15 +41,14 @@ def load_data(path: Union[str, Path], target_col=config.target_column):
 
 def build_model():
     num_cols, cat_cols, engineered_cols = all_feature_columns()
+    model_num_cols = num_cols + engineered_cols
 
-    num_cols = num_cols + engineered_cols
-
-    if not num_cols and not cat_cols:
+    if not model_num_cols and not cat_cols:
         raise ValueError("Список признаков пуст.")
 
     preprocess = ColumnTransformer(
         transformers=[
-            ("num", StandardScaler(), num_cols),
+            ("num", StandardScaler(), model_num_cols),
             ("cat", OneHotEncoder(drop='first', handle_unknown="ignore"), cat_cols),
         ],
         remainder="drop",
@@ -69,7 +68,7 @@ def build_model():
         )
     ])
 
-    return pipeline, num_cols, cat_cols, engineered_cols
+    return pipeline, model_num_cols, cat_cols, engineered_cols
 
 def save_model(
         model,
@@ -96,6 +95,7 @@ def save_model(
         "params": params,
         "metrics": metrics,
         "python": __import__("sys").version,
+        "sklearn": __import__("sklearn").__version__,
         "feature_schema": feature_schema,
     }
     

@@ -6,17 +6,19 @@ from typing import Tuple, Union
 logger = logging.getLogger(__name__)
 
 ALLOWED_TRANSACTION_TYPES: Tuple[str, ...] = (
+    "CASH_IN",
+    "CASH_OUT",
+    "DEBIT",
     "PAYMENT",
     "TRANSFER",
-    "CASH_OUT",
-    "DEPOSIT",
 )
 
 # Типы, требующие проверки баланса отправителя
 DEBIT_TRANSACTION_TYPES: Tuple[str, ...] = (
+    "CASH_OUT",
+    "DEBIT",
     "PAYMENT",
     "TRANSFER",
-    "CASH_OUT",
 )
 
 @dataclass(frozen=True)

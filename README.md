@@ -9,7 +9,7 @@ https://www.kaggle.com/datasets/amanalisiddiqui/fraud-detection-dataset/data
 1) Положите CSV в `data/dataset.csv`
 2) Запустите:
 ```bash
-python train.py
+python src/train.py
 ```
 
 ## Версионирование модели
@@ -26,7 +26,7 @@ metadata.feature_schema используется для проверки вхо�
 
 ## Инференс (UI)
 ```bash
-streamlit run fraud_detection.py
+streamlit run src/fraud_detection.py
 ```
 
 ## Принцип
