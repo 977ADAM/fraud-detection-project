@@ -7,6 +7,7 @@ import pandas as pd
 import json
 
 from config import config
+from features import add_features
 
 import logging
 
@@ -87,17 +88,15 @@ class FraudModel:
         if df.isnull().any().any():
             raise ValueError("Dataset содержит NaN до feature engineering")
 
-        expected_raw_columns = (
-            self.feature_schema.get("numerical", [])
+        expected_numeric_columns = self.feature_schema.get("numerical", [])
+        expected_model_numeric_columns = self.feature_schema.get(
+            "model_numerical", expected_numeric_columns
         )
-
-        # Исключаем engineered признаки из raw ожиданий
         engineered = self.feature_schema.get("engineered", [])
+        expected_categorical_columns = self.feature_schema.get("categorical", [])
         expected_raw_columns = [
-            col for col in expected_raw_columns if col not in engineered
-        ]
-
-        expected_raw_columns += self.feature_schema.get("categorical", [])
+            col for col in expected_numeric_columns if col not in engineered
+        ] + expected_categorical_columns
 
         missing_cols = [
             col for col in expected_raw_columns if col not in df.columns
@@ -107,12 +106,31 @@ class FraudModel:
             raise ValueError(
                 f"Input schema mismatch. Missing columns: {missing_cols}"
             )
-        
+
+        try:
+            # Добавляем engineered признаки для совместимости моделей без отдельного шага features.
+            df = add_features(df)
+        except Exception as e:
+            raise ValueError(f"Feature engineering failed: {e}")
+
+        expected_model_columns = list(
+            dict.fromkeys(expected_model_numeric_columns + expected_categorical_columns)
+        )
+        missing_model_cols = [
+            col for col in expected_model_columns if col not in df.columns
+        ]
+        if missing_model_cols:
+            raise ValueError(
+                f"Input schema mismatch after feature engineering. Missing columns: {missing_model_cols}"
+            )
+
         unexpected_cols = [
-            col for col in df.columns if col not in expected_raw_columns
+            col for col in df.columns if col not in expected_model_columns
         ]
         if unexpected_cols:
             logger.warning(f"Неожиданные столбцы во входных данных: {unexpected_cols}")
+
+        df = df[expected_model_columns]
 
         logger.info(f"Столбцы фрейма данных Inference: {df.columns.tolist()}")
 
@@ -138,7 +156,8 @@ class FraudModel:
         if hasattr(self.model, "predict_proba"):
             proba_values = self.model.predict_proba(df)
             if proba_values.shape[1] > 1:
-                class_index = list(self.model.classes_).index(1)
+                classes = list(getattr(self.model, "classes_", []))
+                class_index = classes.index(1) if 1 in classes else proba_values.shape[1] - 1
                 probability = float(proba_values[0][class_index])
 
         return PredictionResult(

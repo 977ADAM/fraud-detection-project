@@ -30,6 +30,14 @@ def load_data(path: Union[str, Path], target_col=config.target_column):
     if target_col not in df.columns:
         raise ValueError(f"Нет колонки таргета '{target_col}'. Колонки: {list(df.columns)[:20]} ...")
 
+    required_num_cols, required_cat_cols, _ = all_feature_columns()
+    required_cols = set(required_num_cols + required_cat_cols)
+    missing_cols = sorted(required_cols.difference(df.columns))
+    if missing_cols:
+        raise ValueError(
+            f"В датасете отсутствуют обязательные колонки: {missing_cols}"
+        )
+
     y = df[target_col].astype(int).values
 
     df = df.drop(columns=[target_col])
@@ -68,7 +76,7 @@ def build_model():
         )
     ])
 
-    return pipeline, model_num_cols, cat_cols, engineered_cols
+    return pipeline, num_cols, model_num_cols, cat_cols, engineered_cols
 
 def save_model(
         model,
@@ -123,7 +131,7 @@ def main():
         random_state=config.random_state,
     )
 
-    pipeline, num_cols, cat_cols, engineered_cols = build_model()
+    pipeline, raw_num_cols, model_num_cols, cat_cols, engineered_cols = build_model()
 
     pipeline.fit(X_train, y_train)
     y_pred = pipeline.predict(X_test)
@@ -164,7 +172,8 @@ def main():
             "feature_names": list(feature_names),
         },
         feature_schema = {
-            "numerical": num_cols,
+            "numerical": raw_num_cols,
+            "model_numerical": model_num_cols,
             "categorical": cat_cols,
             "engineered": engineered_cols,
         },
