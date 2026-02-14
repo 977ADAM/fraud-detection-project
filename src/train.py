@@ -13,9 +13,14 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 
 from src.features import add_features, all_feature_columns
-from src.config import config
+from src.config import config, ENGINEERED
 
-def load_data(path: str, target_col="isFraud"):
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+def load_data(path: str, target_col=config.target_column):
     df = pd.read_csv(path)
 
     if df.empty:
@@ -62,16 +67,17 @@ def build_model():
         )
     ])
 
-    return pipeline
+    return pipeline, num_cols, cat_cols
 
 def save_model(
         model,
         metrics: dict,
         params: dict,
+        feature_schema: dict,
         dataset_id: str,
         name: str,
         version: str,
-        base_dir: str = "models") -> Path:
+        base_dir: str = config.model_base_dir) -> Path:
     
     out_dir = Path(base_dir) / name / version
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -87,14 +93,16 @@ def save_model(
         "params": params,
         "metrics": metrics,
         "python": __import__("sys").version,
+        "feature_schema": feature_schema,
     }
     
-    (out_dir / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    (out_dir / config.metadata_name).write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
     return out_dir
 
 def main():
 
-    data_path = Path("./data/dataset.csv")
+    data_path = Path(config.data_base_dir) / "dataset.csv"
+
     if not data_path.exists():
         raise FileNotFoundError(f"Dataset не найден по этому пути: {data_path}")
 
@@ -111,7 +119,7 @@ def main():
         random_state=config.random_state,
     )
 
-    pipeline = build_model()
+    pipeline, num_cols, cat_cols = build_model()
 
     pipeline.fit(X_train, y_train)
     y_pred = pipeline.predict(X_test)
@@ -124,16 +132,17 @@ def main():
         y_proba = None
         roc_auc = None
 
-    print("Classification report:")
-    print(classification_report(y_test, y_pred))
-    print("Confusion matrix:")
-    print(confusion_matrix(y_test, y_pred))
-    print(f"Accuracy: {acc:.4f}")
+    logger.info("Classification report:")
+    logger.info(classification_report(y_test, y_pred))
+    logger.info("Confusion matrix:")
+    logger.info(confusion_matrix(y_test, y_pred))
+
+    logger.info(f"Accuracy: {acc:.4f}")
     
     if roc_auc is not None:
-        print(f"ROC-AUC: {roc_auc:.4f}")
+        logger.info(f"ROC-AUC: {roc_auc:.4f}")
     else:
-        print("ROC-AUC: недоступен")
+        logger.info("ROC-AUC: недоступен")
 
     feature_names = pipeline.named_steps["preprocess"].get_feature_names_out()
 
@@ -149,11 +158,16 @@ def main():
             "test_size": config.test_size,
             "feature_names": list(feature_names),
         },
+        feature_schema = {
+            "numerical": num_cols,
+            "categorical": cat_cols,
+            "engineered": list(ENGINEERED),
+        },
         dataset_id=config.dataset_id,
         name=config.name,
         version=config.version,
     )
-    print(f"Модель сохранена в: {output_dir}")
+    logger.info(f"Модель сохранена в: {output_dir}")
 
 if __name__ == "__main__":
     main()

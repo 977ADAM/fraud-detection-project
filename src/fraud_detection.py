@@ -1,6 +1,6 @@
 import streamlit as st
 from src.inference import FraudModel
-from src.config import config
+from src.config import config, ALLOWED_TRANSACTION_TYPES
 
 
 try:
@@ -18,12 +18,9 @@ st.caption(f"Model version: {config.version}")
 st.divider()
 
 transaction_type = st.selectbox(
-    'Тип транзакции', [
-        'PAYMENT',
-        'TRANSFER',
-        'CASH_OUT',
-        'DEPOSIT'
-        ])
+    'Тип транзакции',
+    ALLOWED_TRANSACTION_TYPES
+)
 
 amount = st.number_input('Количество', min_value = 0.0, value = 1000.0)
 
@@ -36,14 +33,6 @@ newbalanceDest = st.number_input('Новый баланс (приемник)', m
 if st.button('Predict'):
     with st.spinner("Выполняется анализ транзакции..."):
 
-        if newbalanceOrig > oldbalanceOrg:
-            st.warning("Новый баланс отправителя не может быть больше старого.")
-            st.stop()
-
-        if amount > oldbalanceOrg and transaction_type in ["PAYMENT", "TRANSFER", "CASH_OUT"]:
-            st.warning("Сумма транзакции превышает баланс отправителя.")
-            st.stop()
-
         input_data = {
             "type": transaction_type,
             "amount": amount,
@@ -53,13 +42,16 @@ if st.button('Predict'):
             "newbalanceDest": newbalanceDest,
         }
 
-        result = model.predict(input_data)
-
         try:
-            prediction = result.prediction
+            result = model.predict(input_data)
+        except ValueError as e:
+            st.warning(str(e))
+            st.stop()
         except Exception as e:
             st.error(f"Ошибка предсказания: {e}")
             st.stop()
+
+        prediction = result.prediction
 
         proba = result.probability
 

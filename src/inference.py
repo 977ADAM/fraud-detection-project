@@ -4,14 +4,15 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass
 import joblib
 import pandas as pd
+import json
 
 from src.features import add_features
 
-from src.config import config
+from src.config import config, DEBIT_TRANSACTION_TYPES, ALLOWED_TRANSACTION_TYPES
 
 DEFAULT_MODEL_PATH = (
     Path(__file__).parent
-    / "models"
+    / config.model_base_dir
     / config.name
     / config.version
     / "model.pkl"
@@ -28,6 +29,20 @@ class PredictionResult:
 class FraudModel:
 
     def __init__(self, model_path: Path = DEFAULT_MODEL_PATH):
+
+
+        metadata_path = model_path.parent / config.metadata_name
+
+        if metadata_path.exists():
+            self.metadata = json.loads(metadata_path.read_text())
+
+            if self.metadata.get("version") != config.version:
+                raise ValueError(
+                    f"Model version mismatch: "
+                    f"{self.metadata.get('version')} != {config.version}"
+                )
+        else:
+            raise FileNotFoundError(f"Metadata not found: {metadata_path}")
 
         if not model_path.exists():
 
@@ -82,22 +97,40 @@ class FraudModel:
 
         df = add_features(df)
 
-        missing_features = set(self.expected_features) - set(
-            self.model.named_steps["preprocess"].feature_names_in_
-        )
 
-        if missing_features:
+        tx_type = df["type"].iloc[0]
+
+        if tx_type not in ALLOWED_TRANSACTION_TYPES:
             raise ValueError(
-                f"Inference features mismatch. Missing: {missing_features}"
+                f"Unsupported transaction type: {tx_type}. "
+                f"Allowed types: {ALLOWED_TRANSACTION_TYPES}"
             )
-        
-        if df["newbalanceOrig"].iloc[0] > df["oldbalanceOrg"].iloc[0]:
+
+        expected_columns = set(
+            self.metadata["feature_schema"]["numerical"]
+            + self.metadata["feature_schema"]["categorical"]
+            + self.metadata["feature_schema"]["engineered"]
+        )
+        actual_columns = set(df.columns)
+
+        missing_columns = expected_columns - actual_columns
+
+        if missing_columns:
+            raise ValueError(
+                f"Inference input mismatch. Missing columns: {missing_columns}"
+            )
+
+
+
+        old_balance = df["oldbalanceOrg"].iloc[0]
+        new_balance = df["newbalanceOrig"].iloc[0]
+        amount = df["amount"].iloc[0]
+        tx_type = df["type"].iloc[0]
+
+        if new_balance > old_balance:
             raise ValueError("newbalanceOrig cannot exceed oldbalanceOrg")
 
-        if (
-            df["amount"].iloc[0] > df["oldbalanceOrg"].iloc[0]
-            and df["type"].iloc[0] in ["PAYMENT", "TRANSFER", "CASH_OUT"]
-        ):
+        if amount > old_balance and tx_type in DEBIT_TRANSACTION_TYPES:
             raise ValueError("Transaction amount exceeds sender balance")
 
         return df

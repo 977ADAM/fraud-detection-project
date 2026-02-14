@@ -1,9 +1,9 @@
 import pandas as pd
 from typing import Tuple, List
+from src.config import ENGINEERED
 
 NUMERICALS = ["amount", "oldbalanceOrg", "newbalanceOrig", "oldbalanceDest", "newbalanceDest"]
 CATEGORICALS = ["type"]
-ENGINEERED = ["balanceDiffOrig", "balanceDiffDest"]
 DROP_COLUMNS = ["step", "nameOrig", "nameDest", "isFlaggedFraud"]
 
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
