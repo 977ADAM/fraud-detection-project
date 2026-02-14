@@ -13,8 +13,12 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 
-from features import add_features, all_feature_columns
-from config import config
+try:
+    from .features import add_features, all_feature_columns
+    from .config import config
+except ImportError:
+    from features import add_features, all_feature_columns
+    from config import config
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +43,12 @@ def load_data(path: Union[str, Path], target_col=config.target_column):
         )
 
     y = df[target_col].astype(int).values
+    unique_target_values = set(pd.Series(y).dropna().unique().tolist())
+    if not unique_target_values.issubset({0, 1}):
+        raise ValueError(
+            f"Таргет '{target_col}' должен содержать только 0/1. "
+            f"Найдено: {sorted(unique_target_values)}"
+        )
 
     df = df.drop(columns=[target_col])
 
@@ -123,11 +133,18 @@ def main():
     if pd.isnull(X).any().any():
         raise ValueError("В данных есть NaN перед обучением.")
 
+    unique_classes = set(y.tolist())
+    stratify_target = y if len(unique_classes) > 1 else None
+    if stratify_target is None:
+        logger.warning(
+            "В таргете только один класс; разбиение выполнено без stratify."
+        )
+
     X_train, X_test, y_train, y_test = train_test_split(
         X,
         y,
         test_size=config.test_size,
-        stratify=y,
+        stratify=stratify_target,
         random_state=config.random_state,
     )
 
@@ -157,7 +174,12 @@ def main():
     else:
         logger.info("ROC-AUC: недоступен")
 
-    feature_names = pipeline.named_steps["preprocess"].get_feature_names_out()
+    try:
+        feature_names = pipeline.named_steps["preprocess"].get_feature_names_out()
+        feature_names_list = list(feature_names)
+    except Exception:
+        logger.exception("Не удалось извлечь имена признаков из preprocess.")
+        feature_names_list = []
 
     output_dir = save_model(
         model=pipeline,
@@ -169,7 +191,7 @@ def main():
             "max_iter": config.max_iter,
             "random_state": config.random_state,
             "test_size": config.test_size,
-            "feature_names": list(feature_names),
+            "feature_names": feature_names_list,
         },
         feature_schema = {
             "numerical": raw_num_cols,

@@ -9,7 +9,7 @@ https://www.kaggle.com/datasets/amanalisiddiqui/fraud-detection-dataset/data
 1) Положите CSV в `data/dataset.csv`
 2) Запустите:
 ```bash
-python src/train.py
+python3 src/train.py
 ```
 
 ## Версионирование модели

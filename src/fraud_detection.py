@@ -1,6 +1,10 @@
 import streamlit as st
-from inference import FraudModel
-from config import config, ALLOWED_TRANSACTION_TYPES
+try:
+    from .inference import FraudModel
+    from .config import config, ALLOWED_TRANSACTION_TYPES
+except ImportError:
+    from inference import FraudModel
+    from config import config, ALLOWED_TRANSACTION_TYPES
 
 
 try:

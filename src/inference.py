@@ -6,8 +6,12 @@ import joblib
 import pandas as pd
 import json
 
-from config import config
-from features import add_features
+try:
+    from .config import config
+    from .features import add_features
+except ImportError:
+    from config import config
+    from features import add_features
 
 import logging
 
@@ -50,6 +54,9 @@ class FraudModel:
             )
 
         self.model = joblib.load(model_path)
+        self._pipeline_has_feature_step = (
+            hasattr(self.model, "named_steps") and "features" in self.model.named_steps
+        )
 
         self.feature_schema = self.metadata.get("feature_schema")
         if not self.feature_schema:
@@ -89,11 +96,16 @@ class FraudModel:
             raise ValueError("Dataset содержит NaN до feature engineering")
 
         expected_numeric_columns = self.feature_schema.get("numerical", [])
-        expected_model_numeric_columns = self.feature_schema.get(
-            "model_numerical", expected_numeric_columns
-        )
+        expected_model_numeric_columns = self.feature_schema.get("model_numerical")
         engineered = self.feature_schema.get("engineered", [])
         expected_categorical_columns = self.feature_schema.get("categorical", [])
+
+        if expected_model_numeric_columns is None:
+            # Backward compatibility:
+            # старые metadata могут не содержать model_numerical.
+            expected_model_numeric_columns = list(
+                dict.fromkeys(expected_numeric_columns + engineered)
+            )
         expected_raw_columns = [
             col for col in expected_numeric_columns if col not in engineered
         ] + expected_categorical_columns
@@ -107,15 +119,18 @@ class FraudModel:
                 f"Input schema mismatch. Missing columns: {missing_cols}"
             )
 
-        try:
-            # Добавляем engineered признаки для совместимости моделей без отдельного шага features.
-            df = add_features(df)
-        except Exception as e:
-            raise ValueError(f"Feature engineering failed: {e}")
+        if self._pipeline_has_feature_step:
+            expected_model_columns = list(dict.fromkeys(expected_raw_columns))
+        else:
+            try:
+                # Добавляем engineered признаки для моделей без отдельного шага features.
+                df = add_features(df)
+            except Exception as e:
+                raise ValueError(f"Feature engineering failed: {e}")
 
-        expected_model_columns = list(
-            dict.fromkeys(expected_model_numeric_columns + expected_categorical_columns)
-        )
+            expected_model_columns = list(
+                dict.fromkeys(expected_model_numeric_columns + expected_categorical_columns)
+            )
         missing_model_cols = [
             col for col in expected_model_columns if col not in df.columns
         ]
