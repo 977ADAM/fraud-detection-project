@@ -1,6 +1,7 @@
 __pycache__/
 models/
 data/
+mlruns/
 venv
 *.csv
 *.pkl

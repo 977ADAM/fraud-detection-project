@@ -13,6 +13,9 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 
+import mlflow
+import mlflow.sklearn
+
 try:
     from .features import add_features
     from .config import config
@@ -160,6 +163,7 @@ def main():
     pipeline.fit(X_train, y_train)
     y_pred = pipeline.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
+    report = classification_report(y_test, y_pred, output_dict=True)
 
     if len(set(y_test)) > 1 and hasattr(pipeline, "predict_proba"):
         y_proba = pipeline.predict_proba(X_test)[:, 1]
@@ -168,8 +172,37 @@ def main():
         y_proba = None
         roc_auc = None
 
+    mlflow.set_experiment("fraud_detection")
+    with mlflow.start_run(run_name=f"{config.name}_{config.version}"):
+
+        # Логируем параметры
+        mlflow.log_params({
+            "max_iter": config.max_iter,
+            "solver": config.solver,
+            "class_weight": config.class_weight,
+            "test_size": config.test_size,
+            "random_state": config.random_state,
+        })
+        mlflow.log_metric("accuracy", acc)
+        if roc_auc is not None:
+            mlflow.log_metric("roc_auc", roc_auc)
+        mlflow.log_dict(
+            {
+                "numerical": raw_num_cols,
+                "model_numerical": model_num_cols,
+                "categorical": cat_cols,
+                "engineered": engineered_cols,
+            },
+            "feature_schema.json"
+        )
+        mlflow.log_dict(report, "classification_report.json")
+        mlflow.sklearn.log_model(
+            sk_model=pipeline,
+            name="model",
+            registered_model_name="fraud_model"
+        )
+
     logger.info("Classification report:")
-    report = classification_report(y_test, y_pred, output_dict=True)
     logger.info(json.dumps(report, indent=2))
     logger.info("Confusion matrix:")
     logger.info(confusion_matrix(y_test, y_pred))

@@ -1,6 +1,24 @@
 from dataclasses import dataclass
 from typing import List, Dict
 
+from pydantic import ConfigDict, BaseModel
+
+class APIModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+
+class Customer(APIModel):
+    amount: float = None,
+    oldbalanceOrg: float = None,
+    newbalanceOrig: float = None,
+    oldbalanceDest: float = None,
+    newbalanceDest: float = None
+
+
+class PredictRequest(APIModel):
+    customer: Customer
+
 
 @dataclass(frozen=True)
 class FeatureSchema:
