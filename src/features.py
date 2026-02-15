@@ -1,10 +1,11 @@
 import pandas as pd
 from typing import Tuple, List
 
-NUMERICALS = ["amount", "oldbalanceOrg", "newbalanceOrig", "oldbalanceDest", "newbalanceDest"]
-CATEGORICALS = ["type"]
-ENGINEERED = ["balanceDiffOrig", "balanceDiffDest"]
-DROP_COLUMNS = ["step", "nameOrig", "nameDest", "isFlaggedFraud"]
+try:
+    from .schema import FEATURE_SCHEMA
+except ImportError:
+    from schema import FEATURE_SCHEMA
+
 
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -23,12 +24,7 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     
     # требуемые столбцы
-    required_cols = [
-        "oldbalanceOrg",
-        "newbalanceOrig",
-        "oldbalanceDest",
-        "newbalanceDest",
-    ]
+    required_cols = FEATURE_SCHEMA.numerical
 
     missing = [col for col in required_cols if col not in df.columns]
     if missing:
@@ -44,9 +40,6 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
     df["balanceDiffOrig"] = df["oldbalanceOrg"] - df["newbalanceOrig"]
     df["balanceDiffDest"] = df["newbalanceDest"] - df["oldbalanceDest"]
 
-    df = df.drop(columns=DROP_COLUMNS, errors="ignore")
+    df = df.drop(columns=FEATURE_SCHEMA.drop_columns, errors="ignore")
 
     return df
-
-def all_feature_columns() -> Tuple[List[str], List[str], List[str]]:
-    return list(NUMERICALS), list(CATEGORICALS), list(ENGINEERED)

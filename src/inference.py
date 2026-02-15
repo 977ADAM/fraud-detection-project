@@ -9,9 +9,11 @@ import json
 try:
     from .config import config
     from .features import add_features
+    from .schema import FEATURE_SCHEMA
 except ImportError:
     from config import config
     from features import add_features
+    from schema import FEATURE_SCHEMA
 
 import logging
 
@@ -46,6 +48,11 @@ class FraudModel:
         else:
             raise FileNotFoundError(f"Metadata not found: {metadata_path}")
         
+        if "feature_schema" not in self.metadata:
+            raise ValueError("Metadata does not contain feature_schema")
+
+        self.feature_schema = self.metadata["feature_schema"]
+        
         if self.metadata.get("version") != config.version:
             raise ValueError(
                 f"Model version mismatch. "
@@ -58,20 +65,12 @@ class FraudModel:
             hasattr(self.model, "named_steps") and "features" in self.model.named_steps
         )
 
-        self.feature_schema = self.metadata.get("feature_schema")
-        if not self.feature_schema:
-            raise ValueError("Feature schema missing in metadata")
-
     def _prepare_dataframe(self, data: Dict[str, Any]) -> pd.DataFrame:
 
-        required_fields = [
-            "type",
-            "amount",
-            "oldbalanceOrg",
-            "newbalanceOrig",
-            "oldbalanceDest",
-            "newbalanceDest",
-        ]
+        required_fields = (
+            FEATURE_SCHEMA.numerical
+            + FEATURE_SCHEMA.categorical
+        )
 
         missing = [f for f in required_fields if f not in data]
 

@@ -23,8 +23,8 @@ DEBIT_TRANSACTION_TYPES: Tuple[str, ...] = (
 
 @dataclass(frozen=True)
 class Config:
-    version: str = "3.0.0"
-    dataset_id: str = "fraud:v3"
+    version: str = "1.0.0"
+    dataset_id: str = "fraud:v1"
     name: str = "fraud"
     max_iter: int = 2000
     random_state: int = 42

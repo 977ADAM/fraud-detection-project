@@ -14,11 +14,13 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 
 try:
-    from .features import add_features, all_feature_columns
+    from .features import add_features
     from .config import config
+    from .schema import FEATURE_SCHEMA
 except ImportError:
-    from features import add_features, all_feature_columns
+    from features import add_features
     from config import config
+    from schema import FEATURE_SCHEMA
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -34,7 +36,9 @@ def load_data(path: Union[str, Path], target_col=config.target_column):
     if target_col not in df.columns:
         raise ValueError(f"Нет колонки таргета '{target_col}'. Колонки: {list(df.columns)[:20]} ...")
 
-    required_num_cols, required_cat_cols, _ = all_feature_columns()
+
+    required_num_cols = FEATURE_SCHEMA.numerical
+    required_cat_cols = FEATURE_SCHEMA.categorical
     required_cols = set(required_num_cols + required_cat_cols)
     missing_cols = sorted(required_cols.difference(df.columns))
     if missing_cols:
@@ -58,7 +62,10 @@ def load_data(path: Union[str, Path], target_col=config.target_column):
 
 
 def build_model():
-    num_cols, cat_cols, engineered_cols = all_feature_columns()
+    num_cols = FEATURE_SCHEMA.numerical
+    cat_cols = FEATURE_SCHEMA.categorical
+    engineered_cols = FEATURE_SCHEMA.engineered
+
     model_num_cols = num_cols + engineered_cols
 
     if not model_num_cols and not cat_cols:
