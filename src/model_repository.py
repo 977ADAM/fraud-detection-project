@@ -5,10 +5,8 @@ import json
 import joblib
 
 try:
-    from .logging_config import setup_logging
     from .config import config
 except ImportError:
-    from logging_config import setup_logging
     from config import config
 
 logger = logging.getLogger(__name__)
@@ -54,6 +52,8 @@ class ModelRepository:
         """
         if self._metadata is None:
             raise RuntimeError("Метаданные не загружены")
+        if not isinstance(self._metadata, dict):
+            raise ValueError("Некорректный формат metadata: ожидается JSON-объект")
 
         if self._metadata.get("version") != config.version:
             raise ValueError(
@@ -64,6 +64,8 @@ class ModelRepository:
 
         if "feature_schema" not in self._metadata:
             raise ValueError("Отсутствуют метаданные feature_schema")
+        if not isinstance(self._metadata["feature_schema"], dict):
+            raise ValueError("Некорректный формат feature_schema в metadata")
 
     def _load_model(self):
         """

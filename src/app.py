@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
         model = FraudModel(repository=repo)
         app.state.model = model
     except Exception:
-        logger.error("ОшиОшибка инициализации моделибка")
+        logger.exception("Ошибка инициализации модели")
         app.state.model = None
     yield
 

@@ -1,10 +1,6 @@
-from pathlib import Path
 from typing import Dict, Any, Optional
-
 from dataclasses import dataclass
-import joblib
 import pandas as pd
-import json
 import logging
 
 try:
@@ -21,15 +17,11 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL_PATH = config.model_path
-
-
 @dataclass
 class PredictionResult:
     prediction: int
     label: str
     probability: Optional[float]
-
 
 class FraudModel:
 
@@ -64,17 +56,13 @@ class FraudModel:
             raise ValueError(f"Missing required fields: {missing}")
 
         try:
-            df = pd.DataFrame([{
-                "type": data["type"],
-                "amount": float(data["amount"]),
-                "oldbalanceOrg": float(data["oldbalanceOrg"]),
-                "newbalanceOrig": float(data["newbalanceOrig"]),
-                "oldbalanceDest": float(data["oldbalanceDest"]),
-                "newbalanceDest": float(data["newbalanceDest"]),
-            }])
-
+            row: Dict[str, Any] = {}
+            for col in expected_numeric_columns:
+                row[col] = float(data[col])
+            for col in expected_categorical_columns:
+                row[col] = data[col]
+            df = pd.DataFrame([row])
         except (TypeError, ValueError) as e:
-
             raise ValueError(f"Invalid input types: {e}")
         
         if df.isnull().any().any():
@@ -152,11 +140,15 @@ class FraudModel:
         probability = None
 
         if hasattr(self.model, "predict_proba"):
-            proba_values = self.model.predict_proba(df)
-            if proba_values.shape[1] > 1:
-                classes = list(getattr(self.model, "classes_", []))
-                class_index = classes.index(1) if 1 in classes else proba_values.shape[1] - 1
-                probability = float(proba_values[0][class_index])
+            try:
+                proba_values = self.model.predict_proba(df)
+                if proba_values.shape[1] > 1:
+                    classes = list(getattr(self.model, "classes_", []))
+                    class_index = classes.index(1) if 1 in classes else proba_values.shape[1] - 1
+                    probability = float(proba_values[0][class_index])
+            except Exception:
+                logger.exception("predict_proba failed; return prediction without probability")
+                probability = None
 
         return PredictionResult(
             prediction=prediction,
