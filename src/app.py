@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import logging
@@ -40,9 +40,12 @@ app.add_middleware(
 @app.get("/health")
 def health():
     model = getattr(app.state, "model", None)
-    return {
-        "status": "ok" if model is not None else "model_not_loaded",
-    }
+    if model is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="model_not_loaded"
+        )
+    return {"status": "ok"}
 
 @app.post("/predict")
 def predict(req: PredictRequest):

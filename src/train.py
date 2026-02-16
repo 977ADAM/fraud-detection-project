@@ -56,6 +56,12 @@ def load_data(path: Union[str, Path], target_col=config.target_column):
             f"Таргет '{target_col}' должен содержать только 0/1. "
             f"Найдено: {sorted(unique_target_values)}"
         )
+    
+    if len(unique_target_values) < 2:
+        raise ValueError(
+            f"Таргет '{target_col}' содержит только один класс: {sorted(unique_target_values)}. "
+            "Для LogisticRegression требуется минимум два класса."
+        )
 
     df = df.drop(columns=[target_col])
 
@@ -143,12 +149,7 @@ def main():
     if pd.isnull(X).any().any():
         raise ValueError("В данных есть NaN перед обучением.")
 
-    unique_classes = set(y.tolist())
-    stratify_target = y if len(unique_classes) > 1 else None
-    if stratify_target is None:
-        logger.warning(
-            "В таргете только один класс; разбиение выполнено без stratify."
-        )
+    stratify_target = y
 
     X_train, X_test, y_train, y_test = train_test_split(
         X,

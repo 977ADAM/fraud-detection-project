@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any, Dict
 import logging
 import json
+import sys
 import joblib
 
 try:
@@ -66,6 +67,27 @@ class ModelRepository:
             raise ValueError("Отсутствуют метаданные feature_schema")
         if not isinstance(self._metadata["feature_schema"], dict):
             raise ValueError("Некорректный формат feature_schema в metadata")
+
+        metadata_python = self._metadata.get("python")
+        if metadata_python:
+            model_py_major_minor = ".".join(str(metadata_python).split(".")[:2])
+            runtime_py_major_minor = f"{sys.version_info.major}.{sys.version_info.minor}"
+            if model_py_major_minor != runtime_py_major_minor:
+                raise ValueError(
+                    "Несовместимая версия Python. "
+                    f"Model={model_py_major_minor}, Runtime={runtime_py_major_minor}"
+                )
+
+        metadata_sklearn = self._metadata.get("sklearn")
+        if metadata_sklearn:
+            runtime_sklearn = __import__("sklearn").__version__
+            model_sk_major_minor = ".".join(str(metadata_sklearn).split(".")[:2])
+            runtime_sk_major_minor = ".".join(str(runtime_sklearn).split(".")[:2])
+            if model_sk_major_minor != runtime_sk_major_minor:
+                raise ValueError(
+                    "Несовместимая версия scikit-learn. "
+                    f"Model={model_sk_major_minor}, Runtime={runtime_sk_major_minor}"
+                )
 
     def _load_model(self):
         """
