@@ -1,11 +1,21 @@
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 
-from config import config
-from schema import FEATURE_SCHEMA, PredictRequest
-from inference import FraudModel
-from model_repository import ModelRepository
+try:
+    from .schema import PredictRequest
+    from .inference import FraudModel
+    from .model_repository import ModelRepository
+    from .logging_config import setup_logging
+except ImportError:
+    from schema import PredictRequest
+    from inference import FraudModel
+    from model_repository import ModelRepository
+    from logging_config import setup_logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -14,6 +24,7 @@ async def lifespan(app: FastAPI):
         model = FraudModel(repository=repo)
         app.state.model = model
     except Exception:
+        logger.error("ОшиОшибка инициализации моделибка")
         app.state.model = None
     yield
 

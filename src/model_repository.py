@@ -1,15 +1,17 @@
 from pathlib import Path
 from typing import Any, Dict
-
+import logging
 import json
 import joblib
-from logging_config import setup_logging
-from config import config
-import logging
 
-setup_logging()
+try:
+    from .logging_config import setup_logging
+    from .config import config
+except ImportError:
+    from logging_config import setup_logging
+    from config import config
+
 logger = logging.getLogger(__name__)
-
 
 class ModelRepository:
     """

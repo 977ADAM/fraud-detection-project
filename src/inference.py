@@ -48,10 +48,15 @@ class FraudModel:
 
     def _prepare_dataframe(self, data: Dict[str, Any]) -> pd.DataFrame:
 
-        required_fields = (
-            FEATURE_SCHEMA.numerical
-            + FEATURE_SCHEMA.categorical
+        expected_numeric_columns = list(
+            self.feature_schema.get("numerical", FEATURE_SCHEMA.numerical)
         )
+        expected_categorical_columns = list(
+            self.feature_schema.get("categorical", FEATURE_SCHEMA.categorical)
+        )
+        expected_model_numeric_columns = self.feature_schema.get("model_numerical")
+        engineered = list(self.feature_schema.get("engineered", []))
+        required_fields = expected_numeric_columns + expected_categorical_columns
 
         missing = [f for f in required_fields if f not in data]
 
@@ -75,17 +80,15 @@ class FraudModel:
         if df.isnull().any().any():
             raise ValueError("Dataset содержит NaN до feature engineering")
 
-        expected_numeric_columns = self.feature_schema.get("numerical", [])
-        expected_model_numeric_columns = self.feature_schema.get("model_numerical")
-        engineered = self.feature_schema.get("engineered", [])
-        expected_categorical_columns = self.feature_schema.get("categorical", [])
-
         if expected_model_numeric_columns is None:
             # Backward compatibility:
             # старые metadata могут не содержать model_numerical.
             expected_model_numeric_columns = list(
                 dict.fromkeys(expected_numeric_columns + engineered)
             )
+        else:
+            expected_model_numeric_columns = list(expected_model_numeric_columns)
+
         expected_raw_columns = [
             col for col in expected_numeric_columns if col not in engineered
         ] + expected_categorical_columns
