@@ -9,11 +9,12 @@ class APIModel(BaseModel):
 
 
 class Customer(APIModel):
-    amount: float = None,
-    oldbalanceOrg: float = None,
-    newbalanceOrig: float = None,
-    oldbalanceDest: float = None,
-    newbalanceDest: float = None
+    type: str
+    amount: float
+    oldbalanceOrg: float
+    newbalanceOrig: float
+    oldbalanceDest: float
+    newbalanceDest: float
 
 
 class PredictRequest(APIModel):

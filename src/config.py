@@ -37,6 +37,8 @@ class Config:
     dataset_file_name: str = "dataset.csv"
     target_column: str = "isFraud"
     metadata_name: str = "metadata.json"
+    log_level: str = "INFO"
+    json_logs: bool = False
     project_root: Path = field(
         default_factory=lambda: Path(__file__).resolve().parents[1]
     )

@@ -5,22 +5,20 @@ from dataclasses import dataclass
 import joblib
 import pandas as pd
 import json
+import logging
 
 try:
     from .config import config
     from .features import add_features
     from .schema import FEATURE_SCHEMA
+    from .model_repository import ModelRepository
+
 except ImportError:
     from config import config
     from features import add_features
     from schema import FEATURE_SCHEMA
+    from model_repository import ModelRepository
 
-import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
-)
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL_PATH = config.model_path
@@ -35,34 +33,17 @@ class PredictionResult:
 
 class FraudModel:
 
-    def __init__(self, model_path: Path = DEFAULT_MODEL_PATH):
-        model_path = config.resolve_path(model_path)
-        if not model_path.exists():
-            raise FileNotFoundError(f"Model file not found: {model_path}")
+    def __init__(self, repository: ModelRepository | None = None):
 
-        metadata_path = model_path.parent / config.metadata_name
+        self.repository = repository or ModelRepository()
+        self.repository.load()
 
-        if metadata_path.exists():
-            with metadata_path.open("r", encoding="utf-8") as f:
-                self.metadata = json.load(f)
-        else:
-            raise FileNotFoundError(f"Metadata not found: {metadata_path}")
-        
-        if "feature_schema" not in self.metadata:
-            raise ValueError("Metadata does not contain feature_schema")
+        self.model = self.repository.model
+        self.feature_schema = self.repository.feature_schema
 
-        self.feature_schema = self.metadata["feature_schema"]
-        
-        if self.metadata.get("version") != config.version:
-            raise ValueError(
-                f"Model version mismatch. "
-                f"Metadata version={self.metadata.get('version')} "
-                f"Config version={config.version}"
-            )
-
-        self.model = joblib.load(model_path)
         self._pipeline_has_feature_step = (
-            hasattr(self.model, "named_steps") and "features" in self.model.named_steps
+            hasattr(self.model, "named_steps")
+            and "features" in self.model.named_steps
         )
 
     def _prepare_dataframe(self, data: Dict[str, Any]) -> pd.DataFrame:
