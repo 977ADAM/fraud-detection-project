@@ -59,6 +59,7 @@ if st.button('Predict'):
         label = result.label
 
         proba = result.probability
+        shap_values = result.shap_values
 
         if proba is not None:
             st.metric("Вероятность мошенничества", f"{proba:.2%}")
@@ -69,3 +70,17 @@ if st.button('Predict'):
             st.error('Эта транзакция может быть мошеннической.')
         else:
             st.success('Похоже, эта транзакция не является мошенничеством.')
+
+        if shap_values:
+            st.divider()
+            st.subheader("🔍 Объяснение модели (SHAP)")
+
+            sorted_items = sorted(
+                shap_values.items(),
+                key=lambda x: abs(x[1]),
+                reverse=True
+            )
+
+            for feature, value in sorted_items[:10]:
+                direction = "⬆️ увеличивает риск" if value > 0 else "⬇️ снижает риск"
+                st.write(f"**{feature}**: {value:.4f} ({direction})")

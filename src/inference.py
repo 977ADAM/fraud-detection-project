@@ -2,6 +2,8 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass
 import pandas as pd
 import logging
+import shap
+import numpy as np
 
 try:
     from .config import config
@@ -22,6 +24,7 @@ class PredictionResult:
     prediction: int
     label: str
     probability: Optional[float]
+    shap_values: Optional[Dict[str, float]] = None
 
 class FraudModel:
 
@@ -37,6 +40,23 @@ class FraudModel:
             hasattr(self.model, "named_steps")
             and "features" in self.model.named_steps
         )
+
+        # Инициализация SHAP explainer для линейной модели
+        try:
+            clf = self.model.named_steps.get("clf")
+            preprocess = self.model.named_steps.get("preprocess")
+            background = np.zeros((1, preprocess.get_feature_names_out().shape[0]))
+            try:
+                self._explainer = shap.LinearExplainer(
+                    clf,
+                    background,
+                    feature_perturbation="interventional",
+                )
+            except TypeError:
+                self._explainer = shap.LinearExplainer(clf, background)
+        except Exception:
+            logger.warning("SHAP explainer не инициализирован")
+            self._explainer = None
 
     def _prepare_dataframe(self, data: Dict[str, Any]) -> pd.DataFrame:
 
@@ -138,6 +158,7 @@ class FraudModel:
         prediction = int(prediction_array[0])
         
         probability = None
+        shap_dict = None
 
         if hasattr(self.model, "predict_proba"):
             try:
@@ -150,8 +171,36 @@ class FraudModel:
                 logger.exception("predict_proba failed; return prediction without probability")
                 probability = None
 
+        # SHAP explanation
+        if self._explainer is not None:
+            try:
+                if self._pipeline_has_feature_step:
+                    prepared = self.model.named_sreps["features"].transform(df)
+                else:
+                    prepared = df
+
+                transformed = self.model.named_steps["preprocess"].transform(prepared)
+
+                shap_vals = self._explainer.shap_values(transformed)
+
+                if isinstance(shap_vals, list):
+                    shap_vals = shap_vals[1]
+
+                feature_names = self.model.named_steps[
+                    "preprocess"
+                ].get_feature_names_out()
+
+                shap_dict = {
+                    name: float(value)
+                    for name, value in zip(feature_names, shap_vals[0])
+                }
+            except Exception:
+                logger.exception("SHAP explanation failed")
+                shap_dict = None
+
         return PredictionResult(
             prediction=prediction,
             label="fraud" if prediction == 1 else "not_fraud",
             probability=probability,
+            shap_values=shap_dict,
         )

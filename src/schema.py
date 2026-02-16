@@ -1,20 +1,21 @@
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import List, Dict, Annotated, Literal
 
-from pydantic import ConfigDict, BaseModel
+from pydantic import ConfigDict, BaseModel, Field, StringConstraints
 
 class APIModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-
+TransactionType = Literal["CASH_IN", "CASH_OUT", "DEBIT", "PAYMENT", "TRANSFER"]
+NonNegativeFloat = Annotated[float, Field(ge=0)]
 
 class Customer(APIModel):
-    type: str
-    amount: float
-    oldbalanceOrg: float
-    newbalanceOrig: float
-    oldbalanceDest: float
-    newbalanceDest: float
+    type: TransactionType
+    amount: NonNegativeFloat
+    oldbalanceOrg: NonNegativeFloat
+    newbalanceOrig: NonNegativeFloat
+    oldbalanceDest: NonNegativeFloat
+    newbalanceDest: NonNegativeFloat
 
 
 class PredictRequest(APIModel):
